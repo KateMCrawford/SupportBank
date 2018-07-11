@@ -7,7 +7,9 @@ using System.IO;
 using NLog.Config;
 using NLog.Targets;
 using NLog;
-using Json;
+using Newtonsoft.Json;
+using Newtonsoft;
+
 
 namespace SupportBank
 {
@@ -83,11 +85,11 @@ namespace SupportBank
 
     class Transaction
     {
-        private string Date;
-        private string FromAccount;
-        private string ToAccount;
-        private string Narrative;
-        private string Amount;
+        public string Date { get; set; }
+        public string FromAccount { get; set; }
+        public string ToAccount { get; set; }
+        public string Narrative { get; set; }
+        public string Amount { get; set; }
     }
 
     class Program
@@ -159,7 +161,9 @@ namespace SupportBank
             else if (fileLocation.EndsWith(".json"))
             {
                 logger.Info("File ending is .json");
-                JsonConverter.DeserializeObject<List<Transaction>>(fileLocation);
+                List<Transaction> transactionList = new List<Transaction>();
+                string readData = File.ReadAllText(fileLocation);
+                transactionList = JsonConvert.DeserializeObject<List<Transaction>>(readData);
             }
             else
             {
