@@ -7,6 +7,7 @@ using System.IO;
 using NLog.Config;
 using NLog.Targets;
 using NLog;
+using Json;
 
 namespace SupportBank
 {
@@ -17,8 +18,7 @@ namespace SupportBank
 
         private string name;
         private decimal balance;
-        private string extraBalancePlus;
-        private string extraBalanceMinus;
+        private string extraBalance;
         private List<string> transactions = new List<string>();
 
         public EmployeeAccount(string name)
@@ -51,7 +51,7 @@ namespace SupportBank
                     logger.Info("Increasing " + this.name + " balance by " + amount);
                 }
                 else
-                    extraBalancePlus += ", plus " + amount;
+                    extraBalance += ", plus " + amount;
             }
             if (nameTo == this.name)
             {
@@ -61,7 +61,7 @@ namespace SupportBank
                     logger.Info("Decreasing " + this.name + " balance by " + amount);
                 }
                 else
-                    extraBalancePlus += ", minus " + amount;
+                    extraBalance += ", minus " + amount;
             }
         }
 
@@ -76,15 +76,26 @@ namespace SupportBank
 
         public void WriteBalance()
         {
-            Console.WriteLine(this.name + " has balance " + this.balance + this.extraBalancePlus + this.extraBalanceMinus + ". ");
+            Console.WriteLine(this.name + " has balance " + this.balance + this.extraBalance + ". ");
             logger.Info("Writing balance for " + this.name);
         }
+    }
+
+    class Transaction
+    {
+        private string Date;
+        private string FromAccount;
+        private string ToAccount;
+        private string Narrative;
+        private string Amount;
     }
 
     class Program
     {
         static void Main(string[] args)
         {
+            //Start logging
+
             var config = new LoggingConfiguration();
             var target = new FileTarget { FileName = @"C:\Users\KMC\Work\Training\SupportBank\Logs\SupportBankLogs.log", Layout = @"${longdate} ${level} - ${logger}: ${message}" };
             config.AddTarget("File Logger", target);
@@ -93,19 +104,44 @@ namespace SupportBank
 
             ILogger logger = LogManager.GetCurrentClassLogger();
 
-            using (var reader = new StreamReader(@"C:\Users\KMC\Downloads\SupportBank-master\DodgyTransactions2015.csv"))
-            { 
-                List<string> dateList = new List<string>();
-                List<string> fromList = new List<string>();
-                List<string> toList = new List<string>();
-                List<string> narrativeList = new List<string>();
-                List<string> amountList = new List<string>();
+            //Wait for file to import
 
-                logger.Info("Lists initialised");
+            bool notInput = true;
+            string fileLocation = "";
+            while (notInput)
+            {
+                string locationInput = Console.ReadLine();
+                if (locationInput.ToLower().StartsWith("import file "))
+                {
+                    fileLocation = locationInput.Substring(12);
+                    if (File.Exists((fileLocation)) && ((fileLocation.EndsWith(".csv")) || (fileLocation.EndsWith(".json"))))
+                        notInput = false;
+                    else
+                        Console.WriteLine("That file does not exist or is not a readable format");
+                }
+                else
+                    Console.WriteLine("Please input file location to be imported");
 
-                reader.ReadLine();
+            }
 
-                while (!reader.EndOfStream)
+            List<string> dateList = new List<string>();
+            List<string> fromList = new List<string>();
+            List<string> toList = new List<string>();
+            List<string> narrativeList = new List<string>();
+            List<string> amountList = new List<string>();
+
+            logger.Info("Lists initialised");
+
+            //Load file
+
+            if (fileLocation.EndsWith(".csv"))
+            {
+                logger.Info("File ending is .csv");
+                using (var reader = new StreamReader(fileLocation))
+                {
+                    reader.ReadLine();
+
+                    while (!reader.EndOfStream)
                     {
                         var line = reader.ReadLine();
                         var values = line.Split(',');
@@ -117,11 +153,24 @@ namespace SupportBank
                         amountList.Add(values[4]);
                     }
 
+
+                }
+            }
+            else if (fileLocation.EndsWith(".json"))
+            {
+                logger.Info("File ending is .json");
+                JsonConverter.DeserializeObject<List<Transaction>>(fileLocation);
+            }
+            else
+            {
+                Console.WriteLine("Error: something is very broken. This error should not be possible");
+                logger.Info("Very broken, line 129");
+            }
                     IEnumerable<string> distinctNames = fromList.Concat(toList).ToList().Distinct();
 
                     Dictionary<string, EmployeeAccount> accountList = new Dictionary<string, EmployeeAccount>();
 
-                logger.Info("Dictionary created");
+                    logger.Info("Dictionary created");
 
                     foreach (string name in distinctNames)
                     {
@@ -159,9 +208,11 @@ namespace SupportBank
                     else
                         Console.WriteLine("This command was not recognised.");
 
+
                     Console.ReadLine();
                 
             }
-        }
+            
+        
     }
 }
