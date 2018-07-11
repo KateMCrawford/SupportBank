@@ -17,6 +17,8 @@ namespace SupportBank
 
         private string name;
         private decimal balance;
+        private string extraBalancePlus;
+        private string extraBalanceMinus;
         private List<string> transactions = new List<string>();
 
         public EmployeeAccount(string name)
@@ -26,19 +28,40 @@ namespace SupportBank
             logger.Info("Account created for name " + name);
         }
         
-        public void AddTransaction(string date, string nameFrom, string nameTo, string narrative, decimal amount)
+        public void AddTransaction(string date, string nameFrom, string nameTo, string narrative, string amount)
         {
-            transactions.Add("On " + date + ", " + nameFrom + " gave " + nameTo + " £" + Convert.ToString(amount) + " due to " + narrative + ". ");
+            transactions.Add("On " + date + ", " + nameFrom + " gave " + nameTo + " £" + amount + " due to " + narrative + ". ");
             logger.Info("Transaction added");
+            decimal numericalAmount = 0;
+            bool isString = false;
+            try
+            {
+                numericalAmount = Convert.ToDecimal(amount);
+            }
+            catch
+            {
+                isString = true;
+                logger.Info("String given as monetary input");
+            }
             if (nameFrom == this.name)
             {
-                this.balance = this.balance + amount;
-                logger.Info("Increasing " + this.name + " balance by " + Convert.ToString(amount));
+                if (!isString)
+                {
+                    this.balance = this.balance + numericalAmount;
+                    logger.Info("Increasing " + this.name + " balance by " + amount);
+                }
+                else
+                    extraBalancePlus += ", plus " + amount;
             }
             if (nameTo == this.name)
             {
-                this.balance = this.balance - amount;
-                logger.Info("Decreasing " + this.name + " balance by " + Convert.ToString(amount));
+                if (!isString)
+                {
+                    this.balance = this.balance - numericalAmount;
+                    logger.Info("Decreasing " + this.name + " balance by " + amount);
+                }
+                else
+                    extraBalancePlus += ", minus " + amount;
             }
         }
 
@@ -53,7 +76,7 @@ namespace SupportBank
 
         public void WriteBalance()
         {
-            Console.WriteLine(this.name + " has balance " + this.balance + ". ");
+            Console.WriteLine(this.name + " has balance " + this.balance + this.extraBalancePlus + this.extraBalanceMinus + ". ");
             logger.Info("Writing balance for " + this.name);
         }
     }
@@ -70,13 +93,13 @@ namespace SupportBank
 
             ILogger logger = LogManager.GetCurrentClassLogger();
 
-            using (var reader = new StreamReader(@"C:\Users\KMC\Downloads\SupportBank-master\Transactions2014.csv"))
+            using (var reader = new StreamReader(@"C:\Users\KMC\Downloads\SupportBank-master\DodgyTransactions2015.csv"))
             { 
                 List<string> dateList = new List<string>();
                 List<string> fromList = new List<string>();
                 List<string> toList = new List<string>();
                 List<string> narrativeList = new List<string>();
-                List<decimal> amountList = new List<decimal>();
+                List<string> amountList = new List<string>();
 
                 logger.Info("Lists initialised");
 
@@ -91,7 +114,7 @@ namespace SupportBank
                         fromList.Add(values[1]);
                         toList.Add(values[2]);
                         narrativeList.Add(values[3]);
-                        amountList.Add(Convert.ToDecimal(values[4]));
+                        amountList.Add(values[4]);
                     }
 
                     IEnumerable<string> distinctNames = fromList.Concat(toList).ToList().Distinct();
