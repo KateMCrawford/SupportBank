@@ -92,7 +92,7 @@ namespace SupportBank
         public string Narrative { get; set; }
         public string Amount { get; set; }
 
-        public Transaction(string Date, string FromAccout, string ToAccount, string Narrative, string Amount)
+        public Transaction(string Date, string FromAccount, string ToAccount, string Narrative, string Amount)
         {
             this.Date = Date;
             this.FromAccount = FromAccount;
@@ -101,6 +101,8 @@ namespace SupportBank
             this.Amount = Amount;
         }
     }
+
+    
 
     class Program
     {
@@ -170,46 +172,57 @@ namespace SupportBank
             }
             else if (fileLocation.EndsWith(".xml"))
             {
-                string date;
-                string from;
-                string to;
-                string narrative;
-                string amount;
+                string date = "";
+                string from = "";
+                string to = "";
+                string narrative = "";
+                string amount = "";
 
                 XmlReader reader = XmlReader.Create(fileLocation);
                 while (reader.Read())
                 {
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "SupportTransaction")))
+                    bool keepTransaction = true;
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "SupportTransaction")) && (reader.NodeType != XmlNodeType.None))
                     {
                         reader.Read();
                     }
-                    date = Convert.ToString(reader.ReadContentAsDateTime());
+                    if (reader.NodeType != XmlNodeType.None)
+                        date = Convert.ToString(reader.GetAttribute(0));
 
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Description")))
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Description")) && (reader.NodeType != XmlNodeType.None))
                     {
                         reader.Read();
                     }
-                    narrative = reader.ReadContentAsString();
+                    if (reader.NodeType != XmlNodeType.None)
+                        narrative = reader.ReadElementContentAsString();
 
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Value")))
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Value")) && (reader.NodeType != XmlNodeType.None))
                     {
                         reader.Read();
                     }
-                    amount = reader.ReadContentAsString();
+                    if (reader.NodeType != XmlNodeType.None)
+                        amount = reader.ReadElementContentAsString();
 
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "From")))
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "From")) && (reader.NodeType != XmlNodeType.None))
                     {
                         reader.Read();
                     }
-                    from = reader.ReadContentAsString();
+                    if (reader.NodeType != XmlNodeType.None)
+                        from = reader.ReadElementContentAsString();
+                    if (from == null)
+                        keepTransaction = false;
 
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "To")))
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "To")) && (reader.NodeType != XmlNodeType.None))
                     {
                         reader.Read();
                     }
-                    to = reader.ReadContentAsString();
+                    if (reader.NodeType != XmlNodeType.None)
+                        to = reader.ReadElementContentAsString();
+                    if (to == null)
+                        keepTransaction = false;
 
-                    transactionList.Add(new Transaction(date, from, to, narrative, amount));
+                    if (keepTransaction)
+                        transactionList.Add(new Transaction(date, from, to, narrative, amount));
                 }
             }
             else
