@@ -14,94 +14,6 @@ using System.Xml;
 
 namespace SupportBank
 {
-
-    class EmployeeAccount
-    {
-        private static readonly ILogger logger = LogManager.GetCurrentClassLogger();
-
-        private string name;
-        private decimal balance;
-        private string extraBalance;
-        private List<string> transactions = new List<string>();
-
-        public EmployeeAccount(string name)
-        {
-            this.name = name;
-            this.balance = 0;
-            logger.Info("Account created for name " + name);
-        }
-
-        public void AddTransaction(Transaction input)
-        {
-            transactions.Add("On " + input.Date + ", " + input.FromAccount + " gave " + input.ToAccount + " £" + input.Amount + " due to " + input.Narrative + ". ");
-            logger.Info("Transaction added");
-            decimal numericalAmount = 0;
-            bool isString = false;
-            try
-            {
-                numericalAmount = Convert.ToDecimal(input.Amount);
-            }
-            catch
-            {
-                isString = true;
-                logger.Info("String given as monetary input");
-            }
-            if (input.FromAccount == this.name)
-            {
-                if (!isString)
-                {
-                    this.balance = this.balance + numericalAmount;
-                    logger.Info("Increasing " + this.name + " balance by " + input.Amount);
-                }
-                else
-                    extraBalance += ", plus " + input.Amount;
-            }
-            if (input.ToAccount == this.name)
-            {
-                if (!isString)
-                {
-                    this.balance = this.balance - numericalAmount;
-                    logger.Info("Decreasing " + this.name + " balance by " + input.Amount);
-                }
-                else
-                    extraBalance += ", minus " + input.Amount;
-            }
-        }
-
-        public void ListTransactions()
-        {
-            for (int i = 0; i < transactions.Count; i++)
-            {
-                Console.WriteLine(transactions[i]);
-                logger.Info("Printing transaction line " + Convert.ToString(i));
-            }
-        }
-
-        public void WriteBalance()
-        {
-            Console.WriteLine(this.name + " has balance " + this.balance + this.extraBalance + ". ");
-            logger.Info("Writing balance for " + this.name);
-        }
-    }
-
-    class Transaction
-    {
-        public string Date { get; set; }
-        public string FromAccount { get; set; }
-        public string ToAccount { get; set; }
-        public string Narrative { get; set; }
-        public string Amount { get; set; }
-
-        public Transaction(string Date, string FromAccount, string ToAccount, string Narrative, string Amount)
-        {
-            this.Date = Date;
-            this.FromAccount = FromAccount;
-            this.ToAccount = ToAccount;
-            this.Narrative = Narrative;
-            this.Amount = Amount;
-        }
-    }
-
     class Program
     {
         static void Main(string[] args)
@@ -140,94 +52,8 @@ namespace SupportBank
 
             logger.Info("List initialised");
 
-            //Load file
-
-            if (fileLocation.EndsWith(".csv"))
-            {
-                logger.Info("File ending is .csv");
-                using (var reader = new StreamReader(fileLocation))
-                {
-                    reader.ReadLine();
-
-                    while (!reader.EndOfStream)
-                    {
-                        var line = reader.ReadLine();
-                        var values = line.Split(',');
-
-                        transactionList.Add(new Transaction(values[0], values[1], values[2], values[3], values[4]));
-
-                    }
-
-
-                }
-            }
-            else if (fileLocation.EndsWith(".json"))
-            {
-                logger.Info("File ending is .json");
-                string readData = File.ReadAllText(fileLocation);
-                transactionList = JsonConvert.DeserializeObject<List<Transaction>>(readData);
-
-            }
-            else if (fileLocation.EndsWith(".xml"))
-            {
-                string date = "";
-                string from = "";
-                string to = "";
-                string narrative = "";
-                string amount = "";
-
-                XmlReader reader = XmlReader.Create(fileLocation);
-                while (reader.Read())
-                {
-                    bool keepTransaction = true;
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "SupportTransaction")) && (reader.NodeType != XmlNodeType.None))
-                    {
-                        reader.Read();
-                    }
-                    if (reader.NodeType != XmlNodeType.None)
-                        date = Convert.ToString(reader.GetAttribute(0));
-
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Description")) && (reader.NodeType != XmlNodeType.None))
-                    {
-                        reader.Read();
-                    }
-                    if (reader.NodeType != XmlNodeType.None)
-                        narrative = reader.ReadElementContentAsString();
-
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Value")) && (reader.NodeType != XmlNodeType.None))
-                    {
-                        reader.Read();
-                    }
-                    if (reader.NodeType != XmlNodeType.None)
-                        amount = reader.ReadElementContentAsString();
-
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "From")) && (reader.NodeType != XmlNodeType.None))
-                    {
-                        reader.Read();
-                    }
-                    if (reader.NodeType != XmlNodeType.None)
-                        from = reader.ReadElementContentAsString();
-                    if (from == null)
-                        keepTransaction = false;
-
-                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "To")) && (reader.NodeType != XmlNodeType.None))
-                    {
-                        reader.Read();
-                    }
-                    if (reader.NodeType != XmlNodeType.None)
-                        to = reader.ReadElementContentAsString();
-                    if (to == null)
-                        keepTransaction = false;
-
-                    if (keepTransaction)
-                        transactionList.Add(new Transaction(date, from, to, narrative, amount));
-                }
-            }
-            else
-            {
-                Console.WriteLine("Error: something is very broken. This error should not be possible");
-                logger.Info("Very broken, line 129");
-            }
+            LoadFile fileLoader = new LoadFile();
+            transactionList = fileLoader.LoadFileMethod(fileLocation);
 
             Console.WriteLine("File loaded");
 
@@ -299,17 +125,8 @@ namespace SupportBank
                 }
                 else if (input.ToLower().StartsWith("export file "))
                 {
-                    string filePath = input.Substring(12);
-                    if (filePath.EndsWith(".csv"))
-                    {
-                        File.WriteAllText(filePath, "");
-                        for (int i = 0; i < transactionList.Count; i++)
-                        {
-                            File.AppendAllText(filePath, 
-                                transactionList[i].Date + "," + transactionList[i].FromAccount + "," + transactionList[i].ToAccount + "," + transactionList[i].Narrative + "," + transactionList[i].Amount);
-                        }
-                    }
-
+                    WriteFile fileWriter = new WriteFile();
+                    fileWriter.FileWriter(input, transactionList);
                 }
                 else
                     Console.WriteLine("This command was not recognised.");
