@@ -9,6 +9,7 @@ using NLog.Targets;
 using NLog;
 using Newtonsoft.Json;
 using Newtonsoft;
+using System.Xml;
 
 
 namespace SupportBank
@@ -29,41 +30,41 @@ namespace SupportBank
             this.balance = 0;
             logger.Info("Account created for name " + name);
         }
-        
-        public void AddTransaction(string date, string nameFrom, string nameTo, string narrative, string amount)
+
+        public void AddTransaction(Transaction input)
         {
-            transactions.Add("On " + date + ", " + nameFrom + " gave " + nameTo + " £" + amount + " due to " + narrative + ". ");
+            transactions.Add("On " + input.Date + ", " + input.FromAccount + " gave " + input.ToAccount + " £" + input.Amount + " due to " + input.Narrative + ". ");
             logger.Info("Transaction added");
             decimal numericalAmount = 0;
             bool isString = false;
             try
             {
-                numericalAmount = Convert.ToDecimal(amount);
+                numericalAmount = Convert.ToDecimal(input.Amount);
             }
             catch
             {
                 isString = true;
                 logger.Info("String given as monetary input");
             }
-            if (nameFrom == this.name)
+            if (input.FromAccount == this.name)
             {
                 if (!isString)
                 {
                     this.balance = this.balance + numericalAmount;
-                    logger.Info("Increasing " + this.name + " balance by " + amount);
+                    logger.Info("Increasing " + this.name + " balance by " + input.Amount);
                 }
                 else
-                    extraBalance += ", plus " + amount;
+                    extraBalance += ", plus " + input.Amount;
             }
-            if (nameTo == this.name)
+            if (input.ToAccount == this.name)
             {
                 if (!isString)
                 {
                     this.balance = this.balance - numericalAmount;
-                    logger.Info("Decreasing " + this.name + " balance by " + amount);
+                    logger.Info("Decreasing " + this.name + " balance by " + input.Amount);
                 }
                 else
-                    extraBalance += ", minus " + amount;
+                    extraBalance += ", minus " + input.Amount;
             }
         }
 
@@ -90,6 +91,15 @@ namespace SupportBank
         public string ToAccount { get; set; }
         public string Narrative { get; set; }
         public string Amount { get; set; }
+
+        public Transaction(string Date, string FromAccout, string ToAccount, string Narrative, string Amount)
+        {
+            this.Date = Date;
+            this.FromAccount = FromAccount;
+            this.ToAccount = ToAccount;
+            this.Narrative = Narrative;
+            this.Amount = Amount;
+        }
     }
 
     class Program
@@ -116,7 +126,7 @@ namespace SupportBank
                 if (locationInput.ToLower().StartsWith("import file "))
                 {
                     fileLocation = locationInput.Substring(12);
-                    if (File.Exists((fileLocation)) && ((fileLocation.EndsWith(".csv")) || (fileLocation.EndsWith(".json"))))
+                    if (File.Exists((fileLocation)) && ((fileLocation.EndsWith(".csv")) || (fileLocation.EndsWith(".json")) || (fileLocation.EndsWith(".xml"))))
                         notInput = false;
                     else
                         Console.WriteLine("That file does not exist or is not a readable format");
@@ -126,13 +136,9 @@ namespace SupportBank
 
             }
 
-            List<string> dateList = new List<string>();
-            List<string> fromList = new List<string>();
-            List<string> toList = new List<string>();
-            List<string> narrativeList = new List<string>();
-            List<string> amountList = new List<string>();
+            List<Transaction> transactionList = new List<Transaction>();
 
-            logger.Info("Lists initialised");
+            logger.Info("List initialised");
 
             //Load file
 
@@ -148,11 +154,8 @@ namespace SupportBank
                         var line = reader.ReadLine();
                         var values = line.Split(',');
 
-                        dateList.Add(values[0]);
-                        fromList.Add(values[1]);
-                        toList.Add(values[2]);
-                        narrativeList.Add(values[3]);
-                        amountList.Add(values[4]);
+                        transactionList.Add(new Transaction(values[0], values[1], values[2], values[3], values[4]));
+
                     }
 
 
@@ -161,62 +164,134 @@ namespace SupportBank
             else if (fileLocation.EndsWith(".json"))
             {
                 logger.Info("File ending is .json");
-                List<Transaction> transactionList = new List<Transaction>();
                 string readData = File.ReadAllText(fileLocation);
                 transactionList = JsonConvert.DeserializeObject<List<Transaction>>(readData);
+
+            }
+            else if (fileLocation.EndsWith(".xml"))
+            {
+                string date;
+                string from;
+                string to;
+                string narrative;
+                string amount;
+
+                XmlReader reader = XmlReader.Create(fileLocation);
+                while (reader.Read())
+                {
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "SupportTransaction")))
+                    {
+                        reader.Read();
+                    }
+                    date = Convert.ToString(reader.ReadContentAsDateTime());
+
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Description")))
+                    {
+                        reader.Read();
+                    }
+                    narrative = reader.ReadContentAsString();
+
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "Value")))
+                    {
+                        reader.Read();
+                    }
+                    amount = reader.ReadContentAsString();
+
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "From")))
+                    {
+                        reader.Read();
+                    }
+                    from = reader.ReadContentAsString();
+
+                    while (!((reader.NodeType == XmlNodeType.Element) && (reader.Name == "To")))
+                    {
+                        reader.Read();
+                    }
+                    to = reader.ReadContentAsString();
+
+                    transactionList.Add(new Transaction(date, from, to, narrative, amount));
+                }
             }
             else
             {
                 Console.WriteLine("Error: something is very broken. This error should not be possible");
                 logger.Info("Very broken, line 129");
             }
-                    IEnumerable<string> distinctNames = fromList.Concat(toList).ToList().Distinct();
 
-                    Dictionary<string, EmployeeAccount> accountList = new Dictionary<string, EmployeeAccount>();
+            Console.WriteLine("File loaded");
 
-                    logger.Info("Dictionary created");
+            List<string> allNames = new List<string>();
 
+            for (int i = 0; i < transactionList.Count; i++)
+            {
+                allNames.Add(transactionList[i].FromAccount);
+                allNames.Add(transactionList[i].ToAccount);
+            }
+
+            IEnumerable<string> distinctNames = allNames.Distinct();
+
+            Dictionary<string, EmployeeAccount> accountList = new Dictionary<string, EmployeeAccount>();
+
+            logger.Info("Dictionary created");
+
+            foreach (string name in distinctNames)
+            {
+                try
+                {
+                    accountList.Add(name, new EmployeeAccount(name));
+                }
+                catch
+                {
+                    logger.Info("Transaction was input without name");
+                    Console.WriteLine("Error: make sure all transactions have associated names");
+                }
+            }
+
+            for (int i = 0; i < transactionList.Count; i++)
+            {
+                accountList[transactionList[i].FromAccount].AddTransaction(transactionList[i]);
+                accountList[transactionList[i].ToAccount].AddTransaction(transactionList[i]);
+            }
+
+            logger.Info("Transactions loaded into accounts.");
+
+            bool exit = false;
+
+            while (!exit)
+            {
+
+                bool foundName = false;
+
+                string input = Console.ReadLine();
+                if (input.ToLower() == "list all")
                     foreach (string name in distinctNames)
                     {
-                        accountList.Add(name, new EmployeeAccount(name));
+                        accountList[name].WriteBalance();
                     }
-
-                    for (int i = 0; i < dateList.Count; i++)
+                else if (input.StartsWith("list "))
+                {
+                    string inputName = input.Substring(5);
+                    foreach (string name in distinctNames)
                     {
-                        accountList[fromList[i]].AddTransaction(dateList[i], fromList[i], toList[i], narrativeList[i], amountList[i]);
-                        accountList[toList[i]].AddTransaction(dateList[i], fromList[i], toList[i], narrativeList[i], amountList[i]);
-                    }
-
-                    bool foundName = false;
-
-                    string input = Console.ReadLine();
-                    if (input.ToLower() == "list all")
-                        foreach (string name in distinctNames)
+                        if (name.ToLower() == inputName.ToLower())
                         {
-                            accountList[name].WriteBalance();
+                            accountList[name].ListTransactions();
+                            foundName = true;
                         }
-                    else if (input.StartsWith("list "))
-                    {
-                        string inputName = input.Substring(5);
-                        foreach (string name in distinctNames)
-                        {
-                            if (name.ToLower() == inputName.ToLower())
-                            {
-                                accountList[name].ListTransactions();
-                                foundName = true;
-                            }
-                        }
-                        if (!foundName)
-                            Console.WriteLine("This name is not recognised.");
                     }
-                    else
-                        Console.WriteLine("This command was not recognised.");
+                    if (!foundName)
+                        Console.WriteLine("This name is not recognised.");
+                }
+                else if (input.ToLower() == "exit")
+                {
+                    exit = true;
+                }
+                else
+                    Console.WriteLine("This command was not recognised.");
 
-
-                    Console.ReadLine();
-                
             }
-            
-        
+        }
+
+
     }
 }
