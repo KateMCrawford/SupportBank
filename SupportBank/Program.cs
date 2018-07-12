@@ -102,8 +102,6 @@ namespace SupportBank
         }
     }
 
-    
-
     class Program
     {
         static void Main(string[] args)
@@ -298,6 +296,20 @@ namespace SupportBank
                 else if (input.ToLower() == "exit")
                 {
                     exit = true;
+                }
+                else if (input.ToLower().StartsWith("export file "))
+                {
+                    string filePath = input.Substring(12);
+                    if (filePath.EndsWith(".csv"))
+                    {
+                        File.WriteAllText(filePath, "");
+                        for (int i = 0; i < transactionList.Count; i++)
+                        {
+                            File.AppendAllText(filePath, 
+                                transactionList[i].Date + "," + transactionList[i].FromAccount + "," + transactionList[i].ToAccount + "," + transactionList[i].Narrative + "," + transactionList[i].Amount);
+                        }
+                    }
+
                 }
                 else
                     Console.WriteLine("This command was not recognised.");
